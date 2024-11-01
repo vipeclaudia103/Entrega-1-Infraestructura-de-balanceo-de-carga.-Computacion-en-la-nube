@@ -1,8 +1,9 @@
 #!/bin/bash
 
+# Asegurar permisos de install_nginx.sh
+chmod +x install_nginx.sh
 # Instalar Nginx
-apt-get update
-apt-get install -y nginx
+./install.sh
 
 # Obtiene el hostname del worker
 WORKER_NAME=$(hostname)

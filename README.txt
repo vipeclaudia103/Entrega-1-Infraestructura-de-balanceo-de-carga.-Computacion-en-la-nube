@@ -25,6 +25,15 @@ Estructura del Proyecto
         ├── outputs.tf: Archivo de Terraform que especifica las salidas (outputs) de la infraestructura configurada.
         └── variables.tf: Archivo de Terraform que define las variables para personalizar la infraestructura.
 
+Comprobar nginx instalado
+    Verificar el estado del servicio Nginx:
+    text
+    sudo systemctl status nginx
+
+    Esto mostrará si Nginx está activo y en ejecución.
+    Comprobar la sintaxis de la configuración de Nginx:
+    text
+    sudo nginx -t
 Clave ssh
     La contraseña del archivo ssh del host es: entregaC0mpu
     ** Importante **

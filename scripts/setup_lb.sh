@@ -1,13 +1,13 @@
 #!/bin/bash
 
+# Asegurar permisos de install_nginx.sh
+chmod +x install_nginx.sh
 # Instalar Nginx
-apt-get update
-apt-get install -y nginx
-
+./install.sh
 # Copiar la configuración de Nginx
-cat > /etc/nginx/nginx.conf <<EOL
+sudo cat > /etc/nginx/nginx.conf <<EOL
 ${nginx_config}
 EOL
 
 # Reiniciar Nginx para aplicar la configuración
-systemctl restart nginx
+sudo systemctl restart nginx

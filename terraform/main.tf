@@ -49,14 +49,14 @@ resource "azurerm_linux_virtual_machine" "worker" {
   resource_group_name = azurerm_resource_group.rg.name
   location            = azurerm_resource_group.rg.location
   size                = "Standard_B1s"
-  admin_username      = var.ssh_username
+  admin_username      = "${var.ssh_username}-worker-${count.index + 1}"
 
   network_interface_ids = [
     azurerm_network_interface.worker_nic[count.index].id,
   ]
 
   admin_ssh_key {
-    username   = var.ssh_username
+    username   = "${var.ssh_username}-worker-${count.index + 1}"
     public_key = file(var.ssh_public_key_path)
   }
 
@@ -75,8 +75,8 @@ resource "azurerm_linux_virtual_machine" "worker" {
   custom_data = base64encode(
     join("\n", [
       file("${path.module}/../templates/worker_template.html"),
-      file("${path.module}/../scripts/configure_worker.sh")
-    ])
+    file("${path.module}/scripts/install_nginx.sh"),
+    file("${path.module}/scripts/configure_worker.sh")    ])
   )
 }
 
@@ -123,11 +123,14 @@ resource "azurerm_linux_virtual_machine" "lb" {
     version   = "latest"
   }
   # Intalación de nginx en la mv del balanceador y configuración con el archivo lb_nginx.conf
-  custom_data = base64encode(templatefile("${path.module}/../scripts/setup_lb.sh", {
-    nginx_config = templatefile("${path.module}/../templates/lb_nginx.conf", {
-      worker_ips = azurerm_network_interface.worker_nic[*].private_ip_address
+  custom_data = base64encode(join("\n", [
+    file("${path.module}/scripts/install_nginx.sh"),
+    templatefile("${path.module}/scripts/setup_lb.sh", {
+      nginx_config = templatefile("${path.module}/templates/lb_nginx.conf", {
+        worker_ips = azurerm_network_interface.worker_nic[*].private_ip_address
+      })
     })
-  }))
+  ]))
 }
 
 # Crear NIC para el balanceador
