@@ -189,3 +189,36 @@ resource "azurerm_network_interface_security_group_association" "lb_nsg_associat
   network_interface_id      = azurerm_network_interface.lb_nic.id
   network_security_group_id = azurerm_network_security_group.lb_nsg.id
 }
+
+# Configuración de apagado automático para workers
+resource "azurerm_dev_test_global_vm_shutdown_schedule" "shutdown_schedule_worker" {
+  count              = var.worker_count
+  virtual_machine_id = azurerm_linux_virtual_machine.worker[count.index].id
+  location           = azurerm_resource_group.rg.location
+  enabled            = true
+
+  daily_recurrence_time = "2000" # 8:00 PM en formato de 24 horas
+  timezone              = "Romance Standard Time"
+
+  notification_settings {
+    enabled         = true
+    time_in_minutes = 30
+    webhook_url     = "https://sample-webhook-url.example.com"
+  }
+}
+
+# Configuración de apagado automático para balanceador
+resource "azurerm_dev_test_global_vm_shutdown_schedule" "shutdown_schedule_lb" {
+  virtual_machine_id = azurerm_linux_virtual_machine.lb.id
+  location           = azurerm_resource_group.rg.location
+  enabled            = true
+
+  daily_recurrence_time = "2000" # 8:00 PM en formato de 24 horas
+  timezone              = "Romance Standard Time"
+
+  notification_settings {
+    enabled         = true
+    time_in_minutes = 30
+    webhook_url     = "https://sample-webhook-url.example.com"
+  }
+}

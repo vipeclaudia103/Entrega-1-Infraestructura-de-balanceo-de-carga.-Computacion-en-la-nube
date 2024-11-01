@@ -18,10 +18,11 @@ variable "worker_count" {
   default     = 3
 }
 variable "ssh_public_key_path" {
-  description = "Ruta al archivo de clave pública SSH"
+  description = "Path to the SSH public key"
   type        = string
-  default     = "~/.ssh/id_rsa.pub"
+  default     = "~/.ssh/id_rsa.pub"  # Valor por defecto
 }
+
 variable "ssh_username" {
   default = "debian127"
 }

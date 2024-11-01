@@ -13,7 +13,7 @@ Estructura del Proyecto
     ├── deploy.sh: Script principal de despliegue.
     ├── estructura.txt: Guarda la estructura del proyecto.
     ├── README.md: Documentación del proyecto (cambiado de .txt a .md para mejor formato en GitHub).
-    ├── .gitignore: Para ignorar archivos locales y sensibles.
+    ├── .gitignore: Para ignorar archivos locales y sensibles creador por terraform.
     ├── scripts/: Contiene los scripts de configuración.
     │   ├── configure_worker.sh: Script en bash que configura los workers para el entorno de trabajo.
     │   └── setup_lb.sh:Script en bash que configura la mv del balanceador de carga (lb).
@@ -25,12 +25,16 @@ Estructura del Proyecto
         ├── outputs.tf: Archivo de Terraform que especifica las salidas (outputs) de la infraestructura configurada.
         └── variables.tf: Archivo de Terraform que define las variables para personalizar la infraestructura.
 
-Archivo ssh
-La contraseña del archivo ssh del host es: entregaC0mpu
-** Importante **
-Si no hay una clave ssh creada crearla haciendo:
-    ssh-keygen -t rsa -b 4096
-Luego indicar en el archivo de variables el nombre de usuario y ubicación del archivo. Las variables a cambiar son "ssh_public_key_path" y "ssh_username".
+Clave ssh
+    La contraseña del archivo ssh del host es: entregaC0mpu
+    ** Importante **
+    Si no hay una clave ssh creada crearla haciendo:
+        ssh-keygen -t rsa -b 4096 -f ~/.ssh/clave
+    Luego, darle permisos:
+        chmod 600 ~/.ssh/clave
+        chmod 644 ~/.ssh/clave.pub
+
+    Luego indicar en el archivo de variables el nombre de usuario y ubicación del archivo. Las variables a cambiar son "ssh_public_key_path" y "ssh_username".
 
 Bibliografia
 He utilizado el siguiente chat en perplexity para el entregable:

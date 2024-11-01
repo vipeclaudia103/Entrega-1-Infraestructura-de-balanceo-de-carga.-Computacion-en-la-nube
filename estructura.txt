@@ -1,7 +1,6 @@
 .
 ├── deploy.sh
 ├── estructura.txt
-├── .gitignore
 ├── README.txt
 ├── scripts
 │   ├── configure_worker.sh
@@ -12,6 +11,9 @@
 └── terraform
     ├── main.tf
     ├── outputs.tf
+    ├── terraform.tfstate
+    ├── terraform.tfstate.backup
+    ├── tfplan
     └── variables.tf
 
-4 directories, 11 files
+4 directories, 13 files
