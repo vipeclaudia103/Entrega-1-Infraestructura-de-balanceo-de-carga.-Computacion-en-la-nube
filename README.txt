@@ -1,4 +1,6 @@
 # Entrega-1-Infraestructura-de-balanceo-de-carga.-Computacion-en-la-nube
+GitHub
+He creado un repositorio en GitHub del proyecto. Para que no se suban los archivos generados al iniciar terraform, he creado un archivo .gitignore con los archivos temporales.
 Estructura del Proyecto
     1. Archivo principal de Terraform (main.tf)
     2. Variables de Terraform (variables.tf)
