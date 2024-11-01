@@ -10,7 +10,7 @@ variable "location" {
 
 variable "resource_group_name" {
   description = "Nombre del grupo de recursos"
-  default     = "entrega-rg"
+  default     = "entregacompu-rg"
 }
 
 variable "worker_count" {

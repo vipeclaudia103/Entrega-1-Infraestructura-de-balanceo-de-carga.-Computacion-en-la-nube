@@ -1,10 +1,14 @@
 #!/bin/bash
 
+# Cambiar al directorio raíz del proyecto (asumiendo que deploy.sh está en la raíz)
+cd "$(dirname "$0")"
+
 # Función para manejar errores
 handle_error() {
     echo "Error: $1"
     exit 1
 }
+
 # Comprobar si se ha iniciado sesión en Azure
 echo "Comprobando la sesión de Azure..."
 az account show &> /dev/null
@@ -17,9 +21,10 @@ if [ $? -ne 0 ]; then
 else
     echo "Sesión de Azure activa"
 fi
+
 # Verificar si configure_worker.sh existe y darle permisos de ejecución
-if [ -f configure_worker.sh ]; then
-    chmod +x configure_worker.sh
+if [ -f scripts/configure_worker.sh ]; then
+    chmod +x scripts/configure_worker.sh
     echo "Permisos de ejecución otorgados a configure_worker.sh"
 else
     handle_error "configure_worker.sh no encontrado"
@@ -28,7 +33,7 @@ fi
 # Verificar si se solicita destruir la infraestructura
 if [ "$1" = "destroy" ]; then
     echo "Destruyendo la infraestructura..."
-    terraform destroy -auto-approve
+    (cd terraform && terraform destroy -auto-approve)
     if [ $? -ne 0 ]; then
         handle_error "Error al destruir la infraestructura"
     fi
@@ -37,6 +42,9 @@ if [ "$1" = "destroy" ]; then
 fi
 
 echo "Iniciando despliegue..."
+
+# Cambiar al directorio de Terraform
+cd terraform
 
 # Inicializar Terraform
 echo "Inicializando Terraform..."
@@ -72,3 +80,6 @@ echo "Puede acceder al balanceador vía SSH con: ssh lb_user@$LB_IP"
 
 # Mostrar información adicional
 echo "Para destruir la infraestructura, ejecute: $0 destroy"
+
+# Volver al directorio raíz
+cd ..

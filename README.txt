@@ -1,27 +1,29 @@
-# Entrega-1-Infraestructura-de-balanceo-de-carga.-Computacion-en-la-nube
-GitHub
-He creado un repositorio en GitHub del proyecto. Para que no se suban los archivos generados al iniciar terraform, he creado un archivo .gitignore con los archivos temporales.
-Estructura del Proyecto
-    1. Archivo principal de Terraform (main.tf)
-    2. Variables de Terraform (variables.tf)
-    3. Outputs de Terraform (outputs.tf)
-    4. Script bash para lanzar el proceso (deploy.sh)
-    5. Archivo de configuración de Nginx para el balanceador (lb_nginx.conf)
-    6. Script para configurar los workers (configure_worker.sh)
-    Entrega
-    ├── configure_worker.sh
-    ├── deploy.sh
-    ├── lb_nginx.conf
-    ├── main.tf
-    ├── outputs.tf
-    ├── README.txt
-    ├── terraform.tfstate
-    ├── terraform.tfstate.backup
-    ├── tfplan
-    ├── variables.tf
-    └── worker_template.html
+Entrega-1-Infraestructura-de-balanceo-de-carga.-Computacion-en-la-nube
 
-    1 directory, 11 files
+GitHub
+    He creado un repositorio en GitHub del proyecto.
+    https://github.com/vipeclaudia103/Entrega-1-Infraestructura-de-balanceo-de-carga.-Computacion-en-la-nube 
+    Para que no se suban los archivos generados al iniciar terraform, he creado un archivo .gitignore con los archivos temporales.
+Estructura del Proyecto
+    Al realizar el proyecto lo más automatizadoposible se necesitan varios archivos, por eso los he dividido en carpetas. Para guardar la estructura del proyecto graficamente, he utilizado la libreria tree. Con el siguiente comando desde el directorio raíz, en mi caso Entregable:
+        tree -a -I 'node_modules|.git' --charset utf-8 > estructura.txt
+    
+    Un breve esquema de la estructura y descripción de cada carpeta y archivo:
+        Entrega
+    ├── deploy.sh: Script principal de despliegue.
+    ├── estructura.txt: Guarda la estructura del proyecto.
+    ├── README.md: Documentación del proyecto (cambiado de .txt a .md para mejor formato en GitHub).
+    ├── .gitignore: Para ignorar archivos locales y sensibles.
+    ├── scripts/: Contiene los scripts de configuración.
+    │   ├── configure_worker.sh: Script en bash que configura los workers para el entorno de trabajo.
+    │   └── setup_lb.sh:Script en bash que configura la mv del balanceador de carga (lb).
+    ├── templates/: Contiene las plantillas para Nginx y los workers.
+    │   ├── lb_nginx.conf: Archivo de configuración para Nginx que define las reglas de balanceo de carga.
+    │   └── worker_template.html: Plantilla HTML utilizada para configurar y personalizar los workers.
+    └── terraform/: Contiene los archivos principales de Terraform.
+        ├── main.tf: Archivo principal de configuración de Terraform donde se define la infraestructura.
+        ├── outputs.tf: Archivo de Terraform que especifica las salidas (outputs) de la infraestructura configurada.
+        └── variables.tf: Archivo de Terraform que define las variables para personalizar la infraestructura.
 
 Archivo ssh
 La contraseña del archivo ssh del host es: entregaC0mpu

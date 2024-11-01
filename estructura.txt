@@ -1,0 +1,17 @@
+.
+├── deploy.sh
+├── estructura.txt
+├── .gitignore
+├── README.txt
+├── scripts
+│   ├── configure_worker.sh
+│   └── setup_lb.sh
+├── templates
+│   ├── lb_nginx.conf
+│   └── worker_template.html
+└── terraform
+    ├── main.tf
+    ├── outputs.tf
+    └── variables.tf
+
+4 directories, 11 files

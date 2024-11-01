@@ -74,8 +74,8 @@ resource "azurerm_linux_virtual_machine" "worker" {
 
   custom_data = base64encode(
     join("\n", [
-      file("worker_template.html"),
-      file("configure_worker.sh")
+      file("${path.module}/../templates/worker_template.html"),
+      file("${path.module}/../scripts/configure_worker.sh")
     ])
   )
 }
@@ -122,9 +122,11 @@ resource "azurerm_linux_virtual_machine" "lb" {
     sku       = "11"
     version   = "latest"
   }
-	# Configuración del balanceador de carga con el archivo lb_nginx.conf
-  custom_data = base64encode(templatefile("lb_nginx.conf", {
-    worker_ips = azurerm_network_interface.worker_nic[*].private_ip_address
+  # Intalación de nginx en la mv del balanceador y configuración con el archivo lb_nginx.conf
+  custom_data = base64encode(templatefile("${path.module}/../scripts/setup_lb.sh", {
+    nginx_config = templatefile("${path.module}/../templates/lb_nginx.conf", {
+      worker_ips = azurerm_network_interface.worker_nic[*].private_ip_address
+    })
   }))
 }
 
