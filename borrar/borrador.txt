@@ -1,0 +1,32 @@
+  custom_data = base64encode(join("\n", [
+    file("${path.module}/../scripts/prueba.sh"),
+    file("${path.module}/../scripts/install_nginx.sh"),
+    templatefile("${path.module}/../scripts/setup_lb.sh", {
+      nginx_config = templatefile("${path.module}/../templates/lb_nginx.conf", {
+        worker_ips = azurerm_network_interface.worker_nic[*].private_ip_address
+      })
+    })
+  ]))
+
+  custom_data = base64encode(<<-EOF
+  #cloud-config
+  write_files:
+    - path: /tmp/prueba.sh
+      content: |
+        ${indent(6, file("${path.module}/../scripts/prueba.sh"))}
+    - path: /tmp/install_nginx.sh
+      content: |
+        ${indent(6, file("${path.module}/../scripts/install_nginx.sh"))}
+    - path: /tmp/setup_lb.sh
+      content: |
+        ${indent(6, templatefile("${path.module}/../scripts/setup_lb.sh", {
+          nginx_config = templatefile("${path.module}/../templates/lb_nginx.conf", {
+            worker_ips = azurerm_network_interface.worker_nic[*].private_ip_address
+          })
+        }))}
+  runcmd:
+    - bash /tmp/prueba.sh
+    - bash /tmp/install_nginx.sh
+    - bash /tmp/setup_lb.sh
+  EOF
+  )

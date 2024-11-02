@@ -49,14 +49,14 @@ resource "azurerm_linux_virtual_machine" "worker" {
   resource_group_name = azurerm_resource_group.rg.name
   location            = azurerm_resource_group.rg.location
   size                = "Standard_B1s"
-  admin_username      = "${var.ssh_username}-worker-${count.index + 1}"
+  admin_username      = "worker_user"
 
   network_interface_ids = [
     azurerm_network_interface.worker_nic[count.index].id,
   ]
 
   admin_ssh_key {
-    username   = "${var.ssh_username}-worker-${count.index + 1}"
+    username   = "worker_user"
     public_key = file(var.ssh_public_key_path)
   }
 
@@ -72,12 +72,56 @@ resource "azurerm_linux_virtual_machine" "worker" {
     version   = "latest"
   }
 
-  custom_data = base64encode(
-    join("\n", [
-      file("${path.module}/../templates/worker_template.html"),
-    file("${path.module}/../scripts/install_nginx.sh"),
-    file("${path.module}/../scripts/configure_worker.sh")    ])
-  )
+  custom_data = base64encode(file("${path.module}/../scripts/install_nginx.sh"))
+
+  provisioner "file" {
+    source      = "${path.module}/../templates/worker_template.html"
+    destination = "/tmp/index.html"
+
+    connection {
+      type        = "ssh"
+      user        = "worker_user"
+      private_key = file(var.ssh_private_key_path)
+      host        = self.public_ip_address
+    }
+  }
+  provisioner "file" {
+    source      = "${path.module}/../templates/worker_nginx.conf"
+    destination = "/tmp/worker_nginx.conf"
+
+    connection {
+      type        = "ssh"
+      user        = "worker_user"
+      private_key = file(var.ssh_private_key_path)
+      host        = self.public_ip_address
+    }
+  }
+
+  provisioner "file" {
+    source      = "${path.module}/../scripts/configure_worker.sh"
+    destination = "/tmp/configure_worker.sh"
+
+    connection {
+      type        = "ssh"
+      user        = "worker_user"
+      private_key = file(var.ssh_private_key_path)
+      host        = self.public_ip_address
+    }
+  }
+
+  provisioner "remote-exec" {
+    inline = [
+      "chmod +x /tmp/configure_worker.sh",
+      "sudo /tmp/configure_worker.sh"
+    ]
+
+    connection {
+      type        = "ssh"
+      user        = "worker_user"
+      private_key = file(var.ssh_private_key_path)
+      host        = self.public_ip_address
+    }
+  }
 }
 
 # Crear NIC para workers
@@ -122,32 +166,47 @@ resource "azurerm_linux_virtual_machine" "lb" {
     sku       = "11"
     version   = "latest"
   }
-  # Intalación de nginx en la mv del balanceador y configuración con el archivo lb_nginx.conf
 
-  custom_data = base64encode(<<-EOF
-#cloud-config
-write_files:
-  - path: /tmp/prueba.sh
-    content: |
-      ${file("${path.module}/../scripts/prueba.sh")}
-  - path: /tmp/install_nginx.sh
-    content: |
-      ${file("${path.module}/../scripts/install_nginx.sh")}
-  - path: /tmp/setup_lb.sh
-    content: |
-      ${templatefile("${path.module}/../scripts/setup_lb.sh", {
-        nginx_config = templatefile("${path.module}/../templates/lb_nginx.conf", {
-          worker_ips = azurerm_network_interface.worker_nic[*].private_ip_address
-        })
-      })}
-runcmd:
-  - bash /tmp/prueba.sh
-  - bash /tmp/install_nginx.sh
-  - bash /tmp/setup_lb.sh
-EOF
-)
+  custom_data = base64encode(file("${path.module}/../scripts/install_nginx.sh"))
+
+  provisioner "file" {
+    source      = "${path.module}/../templates/lb_nginx.conf"
+    destination = "/tmp/lb_nginx.conf"
+
+    connection {
+      type        = "ssh"
+      user        = "lb_user"
+      private_key = file(var.ssh_private_key_path)
+      host        = self.public_ip_address
+    }
+  }
+
+  provisioner "file" {
+    source      = "${path.module}/../scripts/configure_lb.sh"
+    destination = "/tmp/configure_lb.sh"
+
+    connection {
+      type        = "ssh"
+      user        = "lb_user"
+      private_key = file(var.ssh_private_key_path)
+      host        = self.public_ip_address
+    }
+  }
+
+  provisioner "remote-exec" {
+    inline = [
+      "chmod +x /tmp/configure_lb.sh",
+      "sudo /tmp/configure_lb.sh"
+    ]
+
+    connection {
+      type        = "ssh"
+      user        = "lb_user"
+      private_key = file(var.ssh_private_key_path)
+      host        = self.public_ip_address
+    }
+  }
 }
-
 # Crear NIC para el balanceador
 resource "azurerm_network_interface" "lb_nic" {
   name                = "${var.prefix}-lb-nic"

@@ -60,3 +60,4 @@ Para poder repasar los pasos de terraform:
 https://www.youtube.com/watch?v=5qaTeexPzQ4&ab_channel=The_Sudo
 
 Estructura de árbol del proyecto con tree:
+tree -a -I 'node_modules|.terraform|.git' --charset utf-8 > estructura_proyecto.txt

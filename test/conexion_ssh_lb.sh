@@ -17,4 +17,4 @@ ssh -i ~/.ssh/id_rsa lb_user@$LB_IP
 #     handle_error "Clave pública SSH no encontrada en $SSH_KEY_PATH"
 # fi
 # Verificar el estado del servicio Nginx:
-sudo systemctl status nginx
+# sudo systemctl status nginx

@@ -1,14 +1,10 @@
 #!/bin/bash
 
-# Asegurar permisos de install_nginx.sh
-chmod +x install_nginx.sh
-# Instalar Nginx
-./install.sh
+# Mover el archivo de configuración de Nginx
+sudo mv /tmp/worker_nginx.conf /etc/nginx/nginx.conf
 
-# Obtiene el hostname del worker
-WORKER_NAME=$(hostname)
-# Configurar página personalizada
-sed "s/WORKER_NAME/$WORKER_NAME/" /tmp/worker_template.html > /var/www/html/index.html
+# Mover el archivo HTML a la ubicación correcta
+sudo mv /tmp/index.html /var/www/html/index.html
 
-# Reiniciar Nginx
-systemctl restart nginx
+# Reiniciar Nginx para aplicar la nueva configuración
+sudo systemctl restart nginx

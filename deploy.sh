@@ -64,6 +64,25 @@ if [ -f "$SSH_KEY_PATH" ]; then
 else
     handle_error "Clave pública SSH no encontrada en $SSH_KEY_PATH"
 fi
+# Solicitar la ruta de la clave SSH privada
+read -p "Introduce la ruta de tu clave SSH privada (deja en blanco para usar ~/.ssh/id_rsa): " SSH_PRIVATE_KEY_PATH
+
+# Si no se proporciona una ruta, usar el valor por defecto
+if [ -z "$SSH_PRIVATE_KEY_PATH" ]; then
+    SSH_PRIVATE_KEY_PATH="~/.ssh/id_rsa"
+fi
+
+# Expandir el tilde (~) si está presente
+SSH_PRIVATE_KEY_PATH=$(eval echo "$SSH_PRIVATE_KEY_PATH")
+
+# Verificar si existe la clave SSH privada y sus permisos
+if [ -f "$SSH_PRIVATE_KEY_PATH" ]; then
+    # Cambiar los permisos a 600 (lectura y escritura solo para el propietario)
+    chmod 600 "$SSH_PRIVATE_KEY_PATH"
+    echo "Permisos correctos otorgados a la clave privada SSH"
+else
+    handle_error "Clave privada SSH no encontrada en $SSH_PRIVATE_KEY_PATH"
+fi
 
 
 
@@ -81,8 +100,9 @@ fi
 
 # Crear un plan de Terraform
 echo "Creando plan de Terraform..."
-terraform plan -var="ssh_public_key_path=$SSH_KEY_PATH" -out tfplan
-if [ $? -ne 0 ]; then
+terraform plan \
+  -var="ssh_public_key_path=$SSH_KEY_PATH" \
+  -var="ssh_private_key_path=$SSH_PRIVATE_KEY_PATH"if [ $? -ne 0 ]; then
     handle_error "Error al crear el plan de Terraform"
 fi
 
