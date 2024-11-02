@@ -24,7 +24,14 @@ Estructura del Proyecto
         ├── main.tf: Archivo principal de configuración de Terraform donde se define la infraestructura.
         ├── outputs.tf: Archivo de Terraform que especifica las salidas (outputs) de la infraestructura configurada.
         └── variables.tf: Archivo de Terraform que define las variables para personalizar la infraestructura.
-
+Explicación de los pasos seguidos
+    1. Investigar y organizar proyecto.
+    2. Crear main.tf con terraform y providers.
+    3. Crear estructura de archivos.
+    4. Crear sh que lance el proyecto o lo destruya.
+    5. Comprobar nginx instalado conectando por ssh.
+        a. En el balanceador de carga con el archivo conexion_ssh_lb.sh.
+        a. En los workers con el archivo conexion_ssh_workers.sh.
 Comprobar nginx instalado
     Verificar el estado del servicio Nginx:
     text

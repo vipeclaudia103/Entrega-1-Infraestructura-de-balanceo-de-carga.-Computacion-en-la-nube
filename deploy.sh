@@ -5,18 +5,20 @@ cd "$(dirname "$0")"
 
 
 # Asegurar los permisos de los scripts, plantillas y configuraciones
-chmod +x deploy.sh scripts/*.sh
+chmod +x scripts/*.sh test/*.sh
 chmod 644 templates/*
 
 # Verificar si se solicita destruir la infraestructura
 if [ "$1" = "destroy" ]; then
     echo "Destruyendo la infraestructura..."
     (cd terraform && terraform destroy -auto-approve)
-    rm -rf .terraform/
-    rm -rf terraform.* .terraform.lock.hcl tfplan
+
     if [ $? -ne 0 ]; then
         handle_error "Error al destruir la infraestructura"
     fi
+    cd terraform
+    rm -rf .terraform/
+    rm -rf terraform.* .terraform.lock.hcl tfplan
     echo "Infraestructura destruida exitosamente"
     exit 0
 fi
@@ -108,9 +110,6 @@ echo "Para destruir la infraestructura, ejecute: $0 destroy"
 # Volver al directorio raíz del proyecto
 cd ..
 
-# Asegurar permisos de los test
-chmod +x test_workers.sh
-
 # Ejecutar pruebas de workers
 echo "Ejecutando pruebas de los workers..."
-./test_workers.sh
+./test/test_workers.sh
