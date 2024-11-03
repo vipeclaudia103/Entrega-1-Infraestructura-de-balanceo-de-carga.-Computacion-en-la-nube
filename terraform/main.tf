@@ -72,17 +72,21 @@ resource "azurerm_linux_virtual_machine" "worker" {
     version   = "latest"
   }
 
-  custom_data = base64encode(<<-EOF
-  #!/bin/bash
-  sudo apt-get update
-  sudo apt-get install -y nginx
-  sudo tee /var/www/html/index.html > /dev/null <<EOT
-  ${file("${path.module}/../templates/worker_template.html")}
+  custom_data = base64encode(<<-EOT
+    #cloud-config
+    package_update: true
+    packages:
+      - nginx
+    write_files:
+      - path: /var/www/html/index.html
+        content: |
+          ${file("${path.module}/../templates/worker_template.html")}
+    runcmd:
+      - systemctl start nginx
+      - systemctl enable nginx
   EOT
-  sudo systemctl enable nginx
-  sudo systemctl start nginx
-  EOF
   )
+
 }
 # Crear NIC para workers
 resource "azurerm_network_interface" "worker_nic" {
