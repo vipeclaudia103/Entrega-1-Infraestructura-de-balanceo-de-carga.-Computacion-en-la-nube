@@ -142,25 +142,19 @@ resource "azurerm_linux_virtual_machine" "lb" {
     package_update: true
     packages:
       - nginx
+    write_files:
+      - path: /etc/nginx/nginx.conf
+        content: |
+          ${templatefile("${path.module}/../templates/lb_nginx.conf", {
+    nginx_backend_servers = local.nginx_backend_servers,
+    domain_name           = azurerm_public_ip.lb_public_ip.fqdn
+})}
     runcmd:
       - systemctl start nginx
       - systemctl enable nginx
-      - |
-        cat <<EOF > /etc/nginx/sites-available/default
-        upstream backend {
-          ${local.nginx_backend_servers}
-        }
-
-        server {
-          listen 80;
-          location / {
-            proxy_pass http://backend;
-          }
-        }
-        EOF
       - systemctl restart nginx
-  EOT
-  )
+    EOT
+)
 }
 
 # Crear NIC para el balanceador
@@ -183,7 +177,7 @@ resource "azurerm_public_ip" "lb_public_ip" {
   location            = azurerm_resource_group.rg.location
   resource_group_name = azurerm_resource_group.rg.name
   allocation_method   = "Static"
-  domain_name_label   = "${var.prefix}-lb"
+  domain_name_label   = "${var.prefix}-lb" # Nombre del DNS
 }
 
 # Regla de seguridad de red para permitir SSH al balanceador
@@ -207,6 +201,18 @@ resource "azurerm_network_security_group" "lb_nsg" {
   security_rule {
     name                       = "HTTP"
     priority                   = 1002
+    direction                  = "Inbound"
+    access                     = "Allow"
+    protocol                   = "Tcp"
+    source_port_range          = "*"
+    destination_port_range     = "80"
+    source_address_prefix      = "*"
+    destination_address_prefix = "10.0.2.0/24"
+  }
+
+  security_rule {
+    name                       = "AllowHTTP"
+    priority                   = 100
     direction                  = "Inbound"
     access                     = "Allow"
     protocol                   = "Tcp"
