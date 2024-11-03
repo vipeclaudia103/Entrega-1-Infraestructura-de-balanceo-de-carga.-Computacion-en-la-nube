@@ -82,6 +82,26 @@ resource "azurerm_linux_virtual_machine" "lb" {
     EOF
 )
 }
+
+  custom_data = base64encode(<<-EOT
+    #cloud-config
+    package_update: true
+    packages:
+      - nginx
+    write_files:
+      - path: /worker_user/scripts/configure_worker.sh
+        content: |
+            ${file("${path.module}/../scripts/configure_worker.sh")}
+          permissions: '0755'
+        - path: /worker_user/scripts/worker_template.html
+          content: |
+            ${file("${path.module}/../templates/worker_template.html")}
+    runcmd:
+      - chmod +x /worker_user/scripts/configure_worker.sh
+      - systemctl start nginx
+      - systemctl enable nginx
+  EOT
+  )
 # Regla de seguridad de red para permitir SSH al balanceador
 resource "azurerm_network_security_group" "lb_nsg" {
   name                = "${var.prefix}-lb-nsg"

@@ -49,14 +49,14 @@ resource "azurerm_linux_virtual_machine" "worker" {
   resource_group_name = azurerm_resource_group.rg.name
   location            = azurerm_resource_group.rg.location
   size                = "Standard_B1s"
-  admin_username      = "worker_user"
+  admin_username      = "worker-${count.index + 1}"
 
   network_interface_ids = [
     azurerm_network_interface.worker_nic[count.index].id,
   ]
 
   admin_ssh_key {
-    username   = "worker_user"
+    username   = "worker-${count.index + 1}"
     public_key = file(var.ssh_public_key_path)
   }
 
@@ -72,22 +72,85 @@ resource "azurerm_linux_virtual_machine" "worker" {
     version   = "latest"
   }
 
-  custom_data = base64encode(<<-EOT
-    #cloud-config
-    package_update: true
-    packages:
-      - nginx
-    write_files:
-      - path: /var/www/html/index.html
-        content: |
-          ${file("${path.module}/../templates/worker_template.html")}
-    runcmd:
-      - systemctl start nginx
-      - systemctl enable nginx
-  EOT
-  )
+  custom_data = base64encode(<<-EOF
+  #!/bin/bash
+  sudo apt-get update
+  sudo apt-get install -y nginx
+  echo '<!DOCTYPE html>
+    <html lang="en">
 
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Worker ${HOSTNAME}</title>
+    </head>
+
+    <body>
+        <h1>Bienvenido al Worker ${HOSTNAME}</h1>
+        <p>Hola soy el worker ${HOSTNAME}.</p>
+    </body>
+
+    </html>' | sudo tee /var/www/html/index.html
+  sudo systemctl enable nginx
+  sudo systemctl start nginx
+  EOF
+  )
 }
+
+# Crear máquina virtual para el balanceador
+resource "azurerm_linux_virtual_machine" "lb" {
+  name                = "${var.prefix}-lb"
+  resource_group_name = azurerm_resource_group.rg.name
+  location            = azurerm_resource_group.rg.location
+  size                = "Standard_B1s"
+  admin_username      = "lb_user"
+
+  network_interface_ids = [
+    azurerm_network_interface.lb_nic.id,
+  ]
+
+  admin_ssh_key {
+    username   = "lb_user"
+    public_key = file(var.ssh_public_key_path)
+  }
+
+  os_disk {
+    caching              = "ReadWrite"
+    storage_account_type = "Standard_LRS"
+  }
+
+  source_image_reference {
+    publisher = "Debian"
+    offer     = "debian-11"
+    sku       = "11"
+    version   = "latest"
+  }
+
+  custom_data = base64encode(<<-EOF
+  #!/bin/bash
+  sudo apt-get update
+  sudo apt-get install -y nginx
+  echo 'http {
+    upstream backend {
+      ${join("\n", [for nic in azurerm_network_interface.worker_nic : "server ${nic.private_ip_address}:80;"])}
+    }
+    server {
+      listen 80;
+      location / {
+        proxy_pass http://backend;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+      }
+    }
+  }' | sudo tee /etc/nginx/nginx.conf
+  sudo systemctl enable nginx
+  sudo systemctl restart nginx
+  EOF
+  )
+}
+
+
+
 # Crear NIC para workers
 resource "azurerm_network_interface" "worker_nic" {
   count               = var.worker_count
@@ -102,60 +165,7 @@ resource "azurerm_network_interface" "worker_nic" {
   }
 }
 
-# Define la lista de servidores de backend en una variable local
-locals {
-  nginx_backend_servers = join("\n", [for id in range(var.worker_count) : "server ${var.prefix}-worker-${id + 1}:80;"])
-}
 
-# Crear máquina virtual para el balanceador
-resource "azurerm_linux_virtual_machine" "lb" {
-  name                = "${var.prefix}-lb"
-  resource_group_name = azurerm_resource_group.rg.name
-  location            = azurerm_resource_group.rg.location
-  size                = "Standard_DS1_v2"
-  admin_username      = "lb_user"
-
-  network_interface_ids = [
-    azurerm_network_interface.lb_nic.id,
-  ]
-
-  admin_ssh_key {
-    username   = "lb_user"
-    public_key = file(var.ssh_public_key_path)
-  }
-
-  os_disk {
-    name                 = "sistema-operativo-lb"
-    caching              = "ReadWrite"
-    storage_account_type = "Standard_LRS"
-  }
-
-  source_image_reference {
-    publisher = "Debian"
-    offer     = "debian-11"
-    sku       = "11"
-    version   = "latest"
-  }
-
-  custom_data = base64encode(<<-EOT
-    #cloud-config
-    package_update: true
-    packages:
-      - nginx
-    write_files:
-      - path: /etc/nginx/nginx.conf
-        content: |
-          ${templatefile("${path.module}/../templates/lb_nginx.conf", {
-    nginx_backend_servers = local.nginx_backend_servers,
-    domain_name           = azurerm_public_ip.lb_public_ip.fqdn
-})}
-    runcmd:
-      - systemctl start nginx
-      - systemctl enable nginx
-      - systemctl restart nginx
-    EOT
-)
-}
 
 # Crear NIC para el balanceador
 resource "azurerm_network_interface" "lb_nic" {
@@ -177,10 +187,9 @@ resource "azurerm_public_ip" "lb_public_ip" {
   location            = azurerm_resource_group.rg.location
   resource_group_name = azurerm_resource_group.rg.name
   allocation_method   = "Static"
-  domain_name_label   = "${var.prefix}-lb" # Nombre del DNS
+  domain_name_label   = "${var.prefix}-lb"
 }
 
-# Regla de seguridad de red para permitir SSH al balanceador
 resource "azurerm_network_security_group" "lb_nsg" {
   name                = "${var.prefix}-lb-nsg"
   location            = azurerm_resource_group.rg.location
@@ -209,18 +218,66 @@ resource "azurerm_network_security_group" "lb_nsg" {
     source_address_prefix      = "*"
     destination_address_prefix = "10.0.2.0/24"
   }
+}
+
+resource "azurerm_network_security_group" "worker_nsg" {
+  name                = "${var.prefix}-worker-nsg"
+  location            = azurerm_resource_group.rg.location
+  resource_group_name = azurerm_resource_group.rg.name
 
   security_rule {
-    name                       = "AllowHTTP"
+    name                       = "AllowHTTPInbound"
     priority                   = 100
     direction                  = "Inbound"
     access                     = "Allow"
     protocol                   = "Tcp"
     source_port_range          = "*"
     destination_port_range     = "80"
-    source_address_prefix      = "*"
-    destination_address_prefix = "10.0.2.0/24"
+    source_address_prefix      = azurerm_subnet.lb_subnet.address_prefixes[0]
+    destination_address_prefix = "*"
   }
+
+  security_rule {
+    name                       = "AllowSSHInbound"
+    priority                   = 110
+    direction                  = "Inbound"
+    access                     = "Allow"
+    protocol                   = "Tcp"
+    source_port_range          = "*"
+    destination_port_range     = "22"
+    source_address_prefix      = "*"
+    destination_address_prefix = "*"
+  }
+
+  security_rule {
+    name                       = "AllowICMPInbound"
+    priority                   = 120
+    direction                  = "Inbound"
+    access                     = "Allow"
+    protocol                   = "Icmp"
+    source_port_range          = "*"
+    destination_port_range     = "*"
+    source_address_prefix      = "*"
+    destination_address_prefix = "*"
+  }
+
+  security_rule {
+    name                       = "DenyAllInbound"
+    priority                   = 4096
+    direction                  = "Inbound"
+    access                     = "Deny"
+    protocol                   = "*"
+    source_port_range          = "*"
+    destination_port_range     = "*"
+    source_address_prefix      = "*"
+    destination_address_prefix = "*"
+  }
+}
+
+resource "azurerm_network_interface_security_group_association" "worker_nsg_association" {
+  count                     = var.worker_count
+  network_interface_id      = azurerm_network_interface.worker_nic[count.index].id
+  network_security_group_id = azurerm_network_security_group.worker_nsg.id
 }
 # Asociar NSG a la NIC del balanceador
 resource "azurerm_network_interface_security_group_association" "lb_nsg_association" {

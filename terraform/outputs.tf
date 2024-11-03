@@ -5,6 +5,7 @@ output "lb_public_ip" {
 output "lb_fqdn" {
   value = azurerm_public_ip.lb_public_ip.fqdn
 }
+
 output "first_worker_ip" {
   value = azurerm_linux_virtual_machine.worker[0].private_ip_address
 }
