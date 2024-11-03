@@ -5,7 +5,7 @@ cd "$(dirname "$0")"
 
 
 # Asegurar los permisos de los scripts, plantillas y configuraciones
-chmod +x scripts/*.sh test/*.sh
+chmod +x terraform/*.sh
 chmod 644 templates/*
 
 # Verificar si se solicita destruir la infraestructura
@@ -102,7 +102,10 @@ fi
 echo "Creando plan de Terraform..."
 terraform plan \
   -var="ssh_public_key_path=$SSH_KEY_PATH" \
-  -var="ssh_private_key_path=$SSH_PRIVATE_KEY_PATH"if [ $? -ne 0 ]; then
+  -var="ssh_private_key_path=$SSH_PRIVATE_KEY_PATH" \
+  -out tfplan
+
+if [ $? -ne 0 ]; then
     handle_error "Error al crear el plan de Terraform"
 fi
 
@@ -127,9 +130,6 @@ echo "Puede acceder al balanceador vía SSH con: ssh lb_user@$LB_IP"
 # Mostrar información adicional
 echo "Para destruir la infraestructura, ejecute: $0 destroy"
 
-# Volver al directorio raíz del proyecto
-cd ..
-
 # Ejecutar pruebas de workers
 echo "Ejecutando pruebas de los workers..."
-./test/test_workers.sh
+./test_workers.sh

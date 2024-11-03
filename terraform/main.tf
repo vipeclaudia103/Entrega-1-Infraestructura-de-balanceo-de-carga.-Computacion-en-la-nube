@@ -1,15 +1,15 @@
 terraform {
-	required_providers {
-		azurerm ={
-			source = "hashicorp/azurerm"
-			version = "~> 4.6.0"
-		}
-	}
-#	required_version = ">= 1.1.0"
+  required_providers {
+    azurerm = {
+      source  = "hashicorp/azurerm"
+      version = "~> 4.6.0"
+    }
+  }
+  #	required_version = ">= 1.1.0"
 }
-provider "azurerm" { #configuracion autentificación del servidor
-	subscription_id = "da0c0d8c-6754-4741-b160-d019bef4484e" # se saca con az account show, elparametro id
-	features {}
+provider "azurerm" {                                       #configuracion autentificación del servidor
+  subscription_id = "da0c0d8c-6754-4741-b160-d019bef4484e" # se saca con az account show, elparametro id
+  features {}
 }
 
 # Crear grupo de recursos
@@ -72,58 +72,18 @@ resource "azurerm_linux_virtual_machine" "worker" {
     version   = "latest"
   }
 
-  custom_data = base64encode(file("${path.module}/../scripts/install_nginx.sh"))
-
-  provisioner "file" {
-    source      = "${path.module}/../templates/worker_template.html"
-    destination = "/tmp/index.html"
-
-    connection {
-      type        = "ssh"
-      user        = "worker_user"
-      private_key = file(var.ssh_private_key_path)
-      host        = self.public_ip_address
-    }
-  }
-  provisioner "file" {
-    source      = "${path.module}/../templates/worker_nginx.conf"
-    destination = "/tmp/worker_nginx.conf"
-
-    connection {
-      type        = "ssh"
-      user        = "worker_user"
-      private_key = file(var.ssh_private_key_path)
-      host        = self.public_ip_address
-    }
-  }
-
-  provisioner "file" {
-    source      = "${path.module}/../scripts/configure_worker.sh"
-    destination = "/tmp/configure_worker.sh"
-
-    connection {
-      type        = "ssh"
-      user        = "worker_user"
-      private_key = file(var.ssh_private_key_path)
-      host        = self.public_ip_address
-    }
-  }
-
-  provisioner "remote-exec" {
-    inline = [
-      "chmod +x /tmp/configure_worker.sh",
-      "sudo /tmp/configure_worker.sh"
-    ]
-
-    connection {
-      type        = "ssh"
-      user        = "worker_user"
-      private_key = file(var.ssh_private_key_path)
-      host        = self.public_ip_address
-    }
-  }
+  custom_data = base64encode(<<-EOF
+  #!/bin/bash
+  sudo apt-get update
+  sudo apt-get install -y nginx
+  sudo tee /var/www/html/index.html > /dev/null <<EOT
+  ${file("${path.module}/../templates/worker_template.html")}
+  EOT
+  sudo systemctl enable nginx
+  sudo systemctl start nginx
+  EOF
+  )
 }
-
 # Crear NIC para workers
 resource "azurerm_network_interface" "worker_nic" {
   count               = var.worker_count
@@ -138,12 +98,17 @@ resource "azurerm_network_interface" "worker_nic" {
   }
 }
 
+# Define la lista de servidores de backend en una variable local
+locals {
+  nginx_backend_servers = join("\n", [for id in range(var.worker_count) : "server ${var.prefix}-worker-${id + 1}:80;"])
+}
+
 # Crear máquina virtual para el balanceador
 resource "azurerm_linux_virtual_machine" "lb" {
   name                = "${var.prefix}-lb"
   resource_group_name = azurerm_resource_group.rg.name
   location            = azurerm_resource_group.rg.location
-  size                = "Standard_B1s"
+  size                = "Standard_DS1_v2"
   admin_username      = "lb_user"
 
   network_interface_ids = [
@@ -156,6 +121,7 @@ resource "azurerm_linux_virtual_machine" "lb" {
   }
 
   os_disk {
+    name                 = "sistema-operativo-lb"
     caching              = "ReadWrite"
     storage_account_type = "Standard_LRS"
   }
@@ -167,46 +133,32 @@ resource "azurerm_linux_virtual_machine" "lb" {
     version   = "latest"
   }
 
-  custom_data = base64encode(file("${path.module}/../scripts/install_nginx.sh"))
+  custom_data = base64encode(<<-EOT
+    #cloud-config
+    package_update: true
+    packages:
+      - nginx
+    runcmd:
+      - systemctl start nginx
+      - systemctl enable nginx
+      - |
+        cat <<EOF > /etc/nginx/sites-available/default
+        upstream backend {
+          ${local.nginx_backend_servers}
+        }
 
-  provisioner "file" {
-    source      = "${path.module}/../templates/lb_nginx.conf"
-    destination = "/tmp/lb_nginx.conf"
-
-    connection {
-      type        = "ssh"
-      user        = "lb_user"
-      private_key = file(var.ssh_private_key_path)
-      host        = self.public_ip_address
-    }
-  }
-
-  provisioner "file" {
-    source      = "${path.module}/../scripts/configure_lb.sh"
-    destination = "/tmp/configure_lb.sh"
-
-    connection {
-      type        = "ssh"
-      user        = "lb_user"
-      private_key = file(var.ssh_private_key_path)
-      host        = self.public_ip_address
-    }
-  }
-
-  provisioner "remote-exec" {
-    inline = [
-      "chmod +x /tmp/configure_lb.sh",
-      "sudo /tmp/configure_lb.sh"
-    ]
-
-    connection {
-      type        = "ssh"
-      user        = "lb_user"
-      private_key = file(var.ssh_private_key_path)
-      host        = self.public_ip_address
-    }
-  }
+        server {
+          listen 80;
+          location / {
+            proxy_pass http://backend;
+          }
+        }
+        EOF
+      - systemctl restart nginx
+  EOT
+  )
 }
+
 # Crear NIC para el balanceador
 resource "azurerm_network_interface" "lb_nic" {
   name                = "${var.prefix}-lb-nic"
@@ -245,7 +197,7 @@ resource "azurerm_network_security_group" "lb_nsg" {
     source_port_range          = "*"
     destination_port_range     = "22"
     source_address_prefix      = "*"
-    destination_address_prefix = "*"
+    destination_address_prefix = "10.0.2.0/24"
   }
 
   security_rule {
@@ -257,10 +209,9 @@ resource "azurerm_network_security_group" "lb_nsg" {
     source_port_range          = "*"
     destination_port_range     = "80"
     source_address_prefix      = "*"
-    destination_address_prefix = "*"
+    destination_address_prefix = "10.0.2.0/24"
   }
 }
-
 # Asociar NSG a la NIC del balanceador
 resource "azurerm_network_interface_security_group_association" "lb_nsg_association" {
   network_interface_id      = azurerm_network_interface.lb_nic.id
