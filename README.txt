@@ -25,6 +25,10 @@ Estructura del Proyecto
         ├── conexion_ssh_worker.sh: Script bash para conectarse al balanceaddor por ssh luego al worker deseado.
         └── test_workers.sh: Script bash para ejecutar las pruebas de conexión por IP y por DNS
 
+    Al final la configuración de los workers y el balanceador la hago a mano. Me conecto con los archivos conexion_ssh_lb y conexion_ssh_worker. Creo un archivo bash en la raín donde pego el contenido de configure_lb y configure_worker respectivamente. Doy permisos al nuevo archivo y lo ejecuto.
+    Una vez ya se han cambiado todas las maquinas hay que hacer terraform refresh y volver a lanzar el archivo test_workers
+
+    Con el archivo deploy tambien se puede destruir la infraestructura.
 Explicación de los pasos seguidos
     1. Investigar y organizar proyecto.
     2. Crear main.tf con terraform y providers.
@@ -43,6 +47,7 @@ Comprobar nginx instalado
     text
     sudo nginx -t
 Clave ssh
+    Pregunto la clave que se quiere utilizar al lanzar el deploy.
     La contraseña del archivo ssh del host es: entregaC0mpu
     ** Importante **
     Si no hay una clave ssh creada crearla haciendo:

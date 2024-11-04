@@ -9,10 +9,9 @@
 └── terraform
     ├── conexion_ssh_lb.sh
     ├── conexion_ssh_worker.sh
-    ├── customs.txt
     ├── main.tf
     ├── outputs.tf
     ├── test_workers.sh
     └── variables.tf
 
-3 directories, 13 files
+3 directories, 12 files
