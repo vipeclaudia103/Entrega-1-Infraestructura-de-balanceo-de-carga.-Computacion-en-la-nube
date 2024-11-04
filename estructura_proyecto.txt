@@ -2,6 +2,7 @@
 ├── deploy.sh
 ├── estructura_proyecto.txt
 ├── .gitignore
+├── hola.txt
 ├── README.txt
 ├── scripts
 │   ├── configure_lb.sh
@@ -14,4 +15,4 @@
     ├── test_workers.sh
     └── variables.tf
 
-3 directories, 12 files
+3 directories, 13 files
