@@ -6,24 +6,25 @@ GitHub
     Para que no se suban los archivos generados al iniciar terraform, he creado un archivo .gitignore con los archivos temporales.
 Estructura del Proyecto
     Al realizar el proyecto lo más automatizadoposible se necesitan varios archivos, por eso los he dividido en carpetas. Para guardar la estructura del proyecto graficamente, he utilizado la libreria tree. Con el siguiente comando desde el directorio raíz, en mi caso Entregable:
-        tree -a -I 'node_modules|.git' --charset utf-8 > estructura.txt
+        tree -a -I 'node_modules|.terraform|.git|terraform.*|tfplan|.terraform.*' --charset utf-8 > estructura_proyecto.txt
     
     Un breve esquema de la estructura y descripción de cada carpeta y archivo:
-        Entrega
-    ├── deploy.sh: Script principal de despliegue.
+.
+    ├── deploy.sh: Script principal de despliegue y destrucción.
     ├── estructura.txt: Guarda la estructura del proyecto.
-    ├── README.md: Documentación del proyecto (cambiado de .txt a .md para mejor formato en GitHub).
+    ├── README.txt: Documentación del proyecto (cambiado de .txt a .md para mejor formato en GitHub).
     ├── .gitignore: Para ignorar archivos locales y sensibles creador por terraform.
-    ├── scripts/: Contiene los scripts de configuración.
+    ├── scripts: Contiene los scripts de configuración para el balanceador y los workers. Copiar en un archivo bash de la maquina cuando no funciona custom_data.
     │   ├── configure_worker.sh: Script en bash que configura los workers para el entorno de trabajo.
-    │   └── setup_lb.sh:Script en bash que configura la mv del balanceador de carga (lb).
-    ├── templates/: Contiene las plantillas para Nginx y los workers.
-    │   ├── lb_nginx.conf: Archivo de configuración para Nginx que define las reglas de balanceo de carga.
-    │   └── worker_template.html: Plantilla HTML utilizada para configurar y personalizar los workers.
+    │   └── configure_lb.sh:Script en bash que configura la mv del balanceador de carga (lb).
     └── terraform/: Contiene los archivos principales de Terraform.
         ├── main.tf: Archivo principal de configuración de Terraform donde se define la infraestructura.
         ├── outputs.tf: Archivo de Terraform que especifica las salidas (outputs) de la infraestructura configurada.
-        └── variables.tf: Archivo de Terraform que define las variables para personalizar la infraestructura.
+        ├── variables.tf: Archivo de Terraform que define las variables para personalizar la infraestructura.
+        ├── conexion_ssh_lb.sh: Script bash para conectarse al balanceaddor por ssh.
+        ├── conexion_ssh_worker.sh: Script bash para conectarse al balanceaddor por ssh luego al worker deseado.
+        └── test_workers.sh: Script bash para ejecutar las pruebas de conexión por IP y por DNS
+
 Explicación de los pasos seguidos
     1. Investigar y organizar proyecto.
     2. Crear main.tf con terraform y providers.

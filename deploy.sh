@@ -5,8 +5,7 @@ cd "$(dirname "$0")"
 
 
 # Asegurar los permisos de los scripts, plantillas y configuraciones
-chmod +x terraform/*.sh
-chmod 644 templates/*
+chmod +x scripts/*.sh
 
 # Verificar si se solicita destruir la infraestructura
 if [ "$1" = "destroy" ]; then

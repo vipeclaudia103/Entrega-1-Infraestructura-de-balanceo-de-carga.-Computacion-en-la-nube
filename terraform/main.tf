@@ -72,27 +72,58 @@ resource "azurerm_linux_virtual_machine" "worker" {
     sku       = "11"
     version   = "latest"
   }
-
   custom_data = base64encode(<<-EOF
-    #!/bin/bash
-    sudo apt-get update
-    sudo apt-get install -y nginx
-    echo '<!DOCTYPE html>
-    <html lang="en">
-    <head>
-      <meta charset="UTF-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>Worker ${count.index + 1}</title>
-    </head>
-    <body>
-      <h1>Bienvenido al Worker ${count.index + 1}</h1>
-      <p>Hola, soy el worker ${count.index + 1}.</p>
-    </body>
-    </html>' | sudo tee /var/www/html/index.html
-    sudo systemctl enable nginx
-    sudo systemctl start nginx
+  #!/bin/bash
+  set -e  # Termina el script si hay un error
+
+  # Actualiza el índice de paquetes
+  echo "Actualizando el índice de paquetes..."
+  sudo apt-get update
+
+  # Instala Nginx
+  echo "Instalando Nginx..."
+  if ! sudo apt-get install -y nginx; then
+    echo "Error: Falló la instalación de Nginx."
+    exit 1
+  fi
+
+  # Define la ruta del archivo index.html
+  INDEX_FILE="/var/www/html/index.html"
+
+  # Verifica si el archivo existe
+  if [ ! -f "$INDEX_FILE" ]; then
+    echo "El archivo $INDEX_FILE no existe. Creándolo..."
+    sudo touch "$INDEX_FILE"
+  fi
+
+  # Obtener el nombre de host y crear el archivo HTML con expansión de variables
+  HOSTNAME=$(hostname)
+
+  # Generar el archivo index.html con el nombre de host expandido
+  echo "<!DOCTYPE html>
+  <html lang='en'>
+  <head>
+      <meta charset='UTF-8'>
+      <meta name='viewport' content='width=device-width, initial-scale=1.0'>
+      <title>Worker $${HOSTNAME}</title>
+  </head>
+  <body>
+      <h1>Bienvenido al Worker $${HOSTNAME}</h1>
+      <p>Respuesta por el servidor Nginx en el worker $${HOSTNAME}.</p>
+  </body>
+  </html>" | sudo tee "$INDEX_FILE" > /dev/null
+
+  # Reinicia Nginx para aplicar los cambios
+  echo "Reiniciando Nginx..."
+  if ! sudo systemctl restart nginx; then
+    echo "Error: Falló al reiniciar Nginx."
+    exit 1
+  fi
+
+  echo "Contenido de $INDEX_FILE actualizado y Nginx reiniciado."
   EOF
   )
+
 }
 
 # Crear máquina virtual para el balanceador
@@ -125,41 +156,72 @@ resource "azurerm_linux_virtual_machine" "lb" {
   }
 
   custom_data = base64encode(<<-EOF
-    #!/bin/bash
-    sudo dpkg --configure -a
-    sudo apt-get update
-    sudo apt-get install -y nginx
+  #!/bin/bash
+  set -e  # Termina el script si hay un error
 
-    # Verificar que Nginx está funcionando correctamente
-    sudo nginx -t && echo "Nginx configuration test passed" || echo "Nginx configuration test failed"
-    echo 'events {
+  # Actualiza el índice de paquetes
+  echo "Actualizando el índice de paquetes..."
+  sudo apt-get update
+
+  # Instala Nginx
+  echo "Instalando Nginx..."
+  if ! sudo apt-get install -y nginx; then
+    echo "Error: Falló la instalación de Nginx."
+    exit 1
+  fi
+
+  # Verifica que Nginx está funcionando correctamente
+  if ! sudo nginx -t; then
+    echo "Error: La prueba de configuración de Nginx falló."
+    exit 1
+  else
+    echo "Prueba de configuración de Nginx pasó."
+  fi
+
+  # Configuración de Nginx
+  echo 'events {
       worker_connections 1024;
-    }
+  }
 
-    http {
-        upstream backend {
-            server 10.0.1.4:80;
-            server 10.0.1.5:80;
-            server 10.0.1.6:80;
-        }
+  http {
+      upstream backend {
+          server 10.0.1.4;
+          server 10.0.1.5;
+          server 10.0.1.6;
+      }
 
-        server {
-            listen 80;
-            server_name entregacompu-lb;
+      server {
+          listen 80;
+          server_name entregacompu-lb;
 
-            location / {
-                proxy_pass http://backend;
-                proxy_set_header Host $host;
-                proxy_set_header X-Real-IP $remote_addr;
-            }
-        }
-    }
-    ' | sudo tee /etc/nginx/nginx.conf
-    sudo nginx -t
-    sudo systemctl enable nginx
-    sudo systemctl restart nginx
+          location / {
+              proxy_pass http://backend;
+              proxy_set_header Host $host;
+              proxy_set_header X-Real-IP $remote_addr;
+          }
+      }
+  }' | sudo tee /etc/nginx/nginx.conf > /dev/null
+
+  # Verifica nuevamente la configuración de Nginx
+  if ! sudo nginx -t; then
+    echo "Error: La configuración de Nginx no es válida después de la modificación."
+    exit 1
+  fi
+
+  # Habilita y reinicia Nginx
+  echo "Habilitando Nginx para que inicie en el arranque..."
+  sudo systemctl enable nginx
+
+  echo "Reiniciando Nginx..."
+  if ! sudo systemctl restart nginx; then
+    echo "Error: Falló al reiniciar Nginx."
+    exit 1
+  fi
+
+  echo "Nginx ha sido instalado y configurado correctamente."
   EOF
   )
+
 }
 
 # Crear NIC para workers
@@ -244,8 +306,8 @@ resource "azurerm_network_security_group" "worker_nsg" {
     protocol                   = "Tcp"
     source_port_range          = "*"
     destination_port_range     = "80"
-    source_address_prefix      = azurerm_subnet.lb_subnet.address_prefixes[0]
-    destination_address_prefix = "*"
+    source_address_prefix      = "*"
+    destination_address_prefix = azurerm_subnet.lb_subnet.address_prefixes[0]
   }
 
   security_rule {
@@ -257,7 +319,7 @@ resource "azurerm_network_security_group" "worker_nsg" {
     source_port_range          = "*"
     destination_port_range     = "22"
     source_address_prefix      = "*"
-    destination_address_prefix = "*"
+    destination_address_prefix = azurerm_subnet.lb_subnet.address_prefixes[0]
   }
 
   security_rule {
@@ -269,7 +331,7 @@ resource "azurerm_network_security_group" "worker_nsg" {
     source_port_range          = "*"
     destination_port_range     = "*"
     source_address_prefix      = "*"
-    destination_address_prefix =    "*"
+    destination_address_prefix = azurerm_subnet.lb_subnet.address_prefixes[0]
   }
 }
 

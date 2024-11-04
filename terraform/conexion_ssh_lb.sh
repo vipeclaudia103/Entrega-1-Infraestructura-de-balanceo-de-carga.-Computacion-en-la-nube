@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# cd "$(dirname "$0")"
+# cd terraform
+
 # Obtener la IP pública del balanceador desde la salida de Terraform
 LB_IP=$(terraform output -raw lb_public_ip)
 

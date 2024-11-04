@@ -1,6 +1,8 @@
 #!/bin/bash
 
+cd ../terraform
 LB_IP=$(terraform output -raw lb_public_ip)
+
 echo "http://$LB_IP"
 echo "Probando el balanceador de carga en $LB_IP"
 for i in {1..5}; do
