@@ -5,10 +5,11 @@ terraform {
       version = "~> 4.6.0"
     }
   }
-  #	required_version = ">= 1.1.0"
+  # required_version = ">= 1.1.0"
 }
-provider "azurerm" {                                       #configuracion autentificación del servidor
-  subscription_id = "da0c0d8c-6754-4741-b160-d019bef4484e" # se saca con az account show, elparametro id
+
+provider "azurerm" {
+  subscription_id = "da0c0d8c-6754-4741-b160-d019bef4484e" # ID de la suscripción
   features {}
 }
 
@@ -73,26 +74,23 @@ resource "azurerm_linux_virtual_machine" "worker" {
   }
 
   custom_data = base64encode(<<-EOF
-  #!/bin/bash
-  sudo apt-get update
-  sudo apt-get install -y nginx
-  echo '<!DOCTYPE html>
+    #!/bin/bash
+    sudo apt-get update
+    sudo apt-get install -y nginx
+    echo '<!DOCTYPE html>
     <html lang="en">
-
     <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Worker ${HOSTNAME}</title>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Worker ${count.index + 1}</title>
     </head>
-
     <body>
-        <h1>Bienvenido al Worker ${HOSTNAME}</h1>
-        <p>Hola soy el worker ${HOSTNAME}.</p>
+      <h1>Bienvenido al Worker ${count.index + 1}</h1>
+      <p>Hola, soy el worker ${count.index + 1}.</p>
     </body>
-
     </html>' | sudo tee /var/www/html/index.html
-  sudo systemctl enable nginx
-  sudo systemctl start nginx
+    sudo systemctl enable nginx
+    sudo systemctl start nginx
   EOF
   )
 }
@@ -127,29 +125,42 @@ resource "azurerm_linux_virtual_machine" "lb" {
   }
 
   custom_data = base64encode(<<-EOF
-  #!/bin/bash
-  sudo apt-get update
-  sudo apt-get install -y nginx
-  echo 'http {
-    upstream backend {
-      ${join("\n", [for nic in azurerm_network_interface.worker_nic : "server ${nic.private_ip_address}:80;"])}
+    #!/bin/bash
+    sudo dpkg --configure -a
+    sudo apt-get update
+    sudo apt-get install -y nginx
+
+    # Verificar que Nginx está funcionando correctamente
+    sudo nginx -t && echo "Nginx configuration test passed" || echo "Nginx configuration test failed"
+    echo 'events {
+      worker_connections 1024;
     }
-    server {
-      listen 80;
-      location / {
-        proxy_pass http://backend;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-      }
+
+    http {
+        upstream backend {
+            server 10.0.1.4:80;
+            server 10.0.1.5:80;
+            server 10.0.1.6:80;
+        }
+
+        server {
+            listen 80;
+            server_name entregacompu-lb;
+
+            location / {
+                proxy_pass http://backend;
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+            }
+        }
     }
-  }' | sudo tee /etc/nginx/nginx.conf
-  sudo systemctl enable nginx
-  sudo systemctl restart nginx
+    ' | sudo tee /etc/nginx/nginx.conf
+    sudo nginx -t
+    sudo systemctl enable nginx
+    sudo systemctl restart nginx
   EOF
   )
 }
-
-
 
 # Crear NIC para workers
 resource "azurerm_network_interface" "worker_nic" {
@@ -164,8 +175,6 @@ resource "azurerm_network_interface" "worker_nic" {
     private_ip_address_allocation = "Dynamic"
   }
 }
-
-
 
 # Crear NIC para el balanceador
 resource "azurerm_network_interface" "lb_nic" {
@@ -190,36 +199,38 @@ resource "azurerm_public_ip" "lb_public_ip" {
   domain_name_label   = "${var.prefix}-lb"
 }
 
+# Configuración de seguridad para el balanceador
 resource "azurerm_network_security_group" "lb_nsg" {
   name                = "${var.prefix}-lb-nsg"
   location            = azurerm_resource_group.rg.location
   resource_group_name = azurerm_resource_group.rg.name
 
   security_rule {
-    name                       = "SSH"
-    priority                   = 1001
+    name                       = "AllowSSH"
+    priority                   = 1000
     direction                  = "Inbound"
     access                     = "Allow"
     protocol                   = "Tcp"
     source_port_range          = "*"
     destination_port_range     = "22"
     source_address_prefix      = "*"
-    destination_address_prefix = "10.0.2.0/24"
+    destination_address_prefix = "*"
   }
 
   security_rule {
-    name                       = "HTTP"
-    priority                   = 1002
+    name                       = "AllowHTTP"
+    priority                   = 1001
     direction                  = "Inbound"
     access                     = "Allow"
     protocol                   = "Tcp"
     source_port_range          = "*"
     destination_port_range     = "80"
     source_address_prefix      = "*"
-    destination_address_prefix = "10.0.2.0/24"
+    destination_address_prefix = "*"
   }
 }
 
+# Configuración de seguridad para workers
 resource "azurerm_network_security_group" "worker_nsg" {
   name                = "${var.prefix}-worker-nsg"
   location            = azurerm_resource_group.rg.location
@@ -250,18 +261,6 @@ resource "azurerm_network_security_group" "worker_nsg" {
   }
 
   security_rule {
-    name                       = "AllowICMPInbound"
-    priority                   = 120
-    direction                  = "Inbound"
-    access                     = "Allow"
-    protocol                   = "Icmp"
-    source_port_range          = "*"
-    destination_port_range     = "*"
-    source_address_prefix      = "*"
-    destination_address_prefix = "*"
-  }
-
-  security_rule {
     name                       = "DenyAllInbound"
     priority                   = 4096
     direction                  = "Inbound"
@@ -270,15 +269,17 @@ resource "azurerm_network_security_group" "worker_nsg" {
     source_port_range          = "*"
     destination_port_range     = "*"
     source_address_prefix      = "*"
-    destination_address_prefix = "*"
+    destination_address_prefix =    "*"
   }
 }
 
+# Asociar NSG a la NIC de los workers
 resource "azurerm_network_interface_security_group_association" "worker_nsg_association" {
   count                     = var.worker_count
   network_interface_id      = azurerm_network_interface.worker_nic[count.index].id
   network_security_group_id = azurerm_network_security_group.worker_nsg.id
 }
+
 # Asociar NSG a la NIC del balanceador
 resource "azurerm_network_interface_security_group_association" "lb_nsg_association" {
   network_interface_id      = azurerm_network_interface.lb_nic.id
@@ -302,7 +303,7 @@ resource "azurerm_dev_test_global_vm_shutdown_schedule" "shutdown_schedule_worke
   }
 }
 
-# Configuración de apagado automático para balanceador
+# Configuración de apagado automático para el balanceador
 resource "azurerm_dev_test_global_vm_shutdown_schedule" "shutdown_schedule_lb" {
   virtual_machine_id = azurerm_linux_virtual_machine.lb.id
   location           = azurerm_resource_group.rg.location
@@ -317,3 +318,4 @@ resource "azurerm_dev_test_global_vm_shutdown_schedule" "shutdown_schedule_lb" {
     webhook_url     = "https://sample-webhook-url.example.com"
   }
 }
+
